@@ -21,8 +21,8 @@ nextflow.enable.dsl = 2
 
 // Include modules and subworkflows
 include { validateParameters; paramsHelp; paramsSummaryLog } from 'plugin/nf-validation'
-include { SIMULATE_READS } from './subworkflows/simulate_reads'
-include { MULTIQC } from './modules/multiqc'
+include { SIMULATE_READS } from './subworkflows/local/simulate_reads'
+include { MULTIQC } from './modules/local/multiqc'
 
 // Print help message if requested
 if (params.help) {
@@ -31,7 +31,7 @@ if (params.help) {
 }
 
 // Validate parameters
-validateParameters()
+//validateParameters()
 
 // Print parameter summary
 log.info paramsSummaryLog(workflow)

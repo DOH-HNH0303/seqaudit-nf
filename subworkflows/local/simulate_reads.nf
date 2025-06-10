@@ -1,8 +1,8 @@
-include { FETCH_GENOME } from '../modules/local/fetch_genome'
-include { PBSIM3_ONT } from '../modules/local/pbsim3_ont'
-include { PBSIM3_PACBIO } from '../modules/local/pbsim3_pacbio'
-include { NANOSIM } from '../modules/local/nanosim'
-include { ART_ILLUMINA } from '../modules/local/art_illumina'
+include { FETCH_GENOME } from '../../modules/local/fetch_genome'
+include { PBSIM3_ONT } from '../../modules/local/pbsim3_ont'
+include { PBSIM3_PACBIO } from '../../modules/local/pbsim3_pacbio'
+include { NANOSIM } from '../../modules/local/nanosim'
+include { ART_ILLUMINA } from '../../modules/local/art_illumina'
 
 workflow SIMULATE_READS {
     take:
