@@ -5,7 +5,7 @@ process PBSIM3_ONT {
     conda "bioconda::pbsim3=3.0.5"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/pbsim3:3.0.5--h43eeafb_0' :
-        'quay.io/biocontainers/pbsim3:3.0.5--h43eeafb_0' }"
+        'quay.io/biocontainers/pbsim3:3.0.5--h9948957_0' }"
 
     input:
     tuple val(meta), path(genome)
