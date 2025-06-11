@@ -12,9 +12,9 @@
 
 ## Introduction
 
-**SeqAudit** is a bioinformatics pipeline that simulating ONT, PacBio, and Illumina sequencing data'
+**SeqAudit** is a bioinformatics pipeline that simulates ONT, PacBio, and Illumina sequencing data'
 
-Create a set of fastq files from an input reference genome fasta. You can provide the number of sample sets that you wish to create for each technology type (Illumina fastq will be created as paired end reads) and provide the reference genome as a path, RefSeq, or Genbank ID,
+Create a set of fastq files from an input reference genome fasta. You can provide the number of sample sets that you wish to create for each technology type (Illumina fastq will be created as paired end reads) and provide the reference genome as a path, RefSeq, or Genbank ID.
 
 ## Usage
 
