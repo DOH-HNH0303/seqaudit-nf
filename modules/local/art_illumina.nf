@@ -5,7 +5,7 @@ process ART_ILLUMINA {
     conda "bioconda::art=2016.06.05"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/art:2016.06.05--h516909a_0' :
-        'quay.io/biocontainers/art:3.19.15--1' }"
+        'quay.io/biocontainers/art:2016.06.05--h869255c_2' }"
 
     input:
     tuple val(meta), path(genome)
