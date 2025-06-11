@@ -29,7 +29,7 @@ process ART_ILLUMINA {
     def fragment_sd = params.illumina_fragment_sd != null ? params.illumina_fragment_sd as Integer : 50
     //def system = params.illumina_system ?: 'HS25'
     def genome_size = 3000000000L
-    def illumina_q_score = = params.illumina_q_score != null ? params.illumina_q_score as Integer : 42
+    def illumina_q_score = params.illumina_q_score != null ? params.illumina_q_score as Integer : 42
 
     // Ensure all values are valid before calculation
     if (num_reads <= 0 || read_length <= 0) {
