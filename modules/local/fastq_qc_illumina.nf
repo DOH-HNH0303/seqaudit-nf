@@ -1,4 +1,4 @@
-process FASTQ_QC {
+process FASTQ_QC_ILLUMINA {
     tag "$meta.id"
     label 'process_low'
 
@@ -24,6 +24,7 @@ process FASTQ_QC {
     """
     # Initialize stats file
     echo "Sample: ${meta.id}" > ${prefix}_qc_stats.txt
+    echo "Platform: Illumina" >> ${prefix}_qc_stats.txt
     echo "===================" >> ${prefix}_qc_stats.txt
     echo "" >> ${prefix}_qc_stats.txt
 
@@ -79,16 +80,6 @@ process FASTQ_QC {
     echo "Total bases: \$total_bases" >> ${prefix}_qc_stats.txt
     echo "Average read length: \$avg_length" >> ${prefix}_qc_stats.txt
 
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        seqkit: \$(seqkit version | cut -d' ' -f2)
-    END_VERSIONS
-    """
-
-    stub:
-    prefix = task.ext.prefix ?: "${meta.id}"
-    """
-    touch ${prefix}_qc_stats.txt
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         seqkit: \$(seqkit version | cut -d' ' -f2)

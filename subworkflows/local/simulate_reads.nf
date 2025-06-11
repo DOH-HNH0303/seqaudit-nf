@@ -3,7 +3,9 @@ include { PBSIM3_ONT } from '../../modules/local/pbsim3_ont'
 include { PBSIM3_PACBIO } from '../../modules/local/pbsim3_pacbio'
 include { NANOSIM } from '../../modules/local/nanosim'
 include { ART_ILLUMINA } from '../../modules/local/art_illumina'
-include { FASTQ_QC } from '../../modules/local/fastq_qc'
+include { FASTQ_QC_ONT } from '../../modules/local/fastq_qc_ont'
+include { FASTQ_QC_PACBIO } from '../../modules/local/fastq_qc_pacbio'
+include { FASTQ_QC_ILLUMINA } from '../../modules/local/fastq_qc_illumina'
 include { QC_SUMMARY } from '../../modules/local/qc_summary'
 
 workflow SIMULATE_READS {
@@ -14,6 +16,10 @@ workflow SIMULATE_READS {
     ch_versions = Channel.empty()
     ch_qc_reports = Channel.empty()
 
+    // Debug: Print parameters
+    log.info "ONT simulator: ${params.ont_simulator}"
+    log.info "ONT model URL: ${params.ont_model_url}"
+
     // Fetch genome sequences
     FETCH_GENOME(ch_input)
     ch_versions = ch_versions.mix(FETCH_GENOME.out.versions)
@@ -21,34 +27,47 @@ workflow SIMULATE_READS {
     // Branch based on simulation requirements
     ch_genomes = FETCH_GENOME.out.genome
 
+    // Debug: Check what's in the channel
+    ch_genomes.view { meta, genome -> "Genome channel: ${meta}" }
+
     // ONT simulation branch
-    ch_ont_input = ch_genomes.filter { meta, genome -> meta.ont_reads > 0 }
+    ch_ont_input = ch_genomes.filter { meta, genome ->
+        log.info "Checking ONT reads for ${meta.id}: ${meta.ont_reads}"
+        meta.ont_reads > 0
+    }
     ch_ont_reads = Channel.empty()
 
+    // Debug: Check filtered channel
+    ch_ont_input.view { meta, genome -> "ONT input: ${meta.id} with ${meta.ont_reads} reads" }
+
     if (params.ont_simulator == 'pbsim3') {
+        log.info "Using PBSIM3 for ONT simulation"
         ont_model_file = Channel.fromPath(params.ont_model_url)
         PBSIM3_ONT(ch_ont_input, ont_model_file)
         ch_ont_reads = PBSIM3_ONT.out.reads
         ch_versions = ch_versions.mix(PBSIM3_ONT.out.versions)
 
         // QC for ONT reads
-        FASTQ_QC(ch_ont_reads.map { meta, reads ->
+        FASTQ_QC_ONT(ch_ont_reads.map { meta, reads ->
             [meta + [platform: 'ont'], reads]
         })
-        ch_qc_reports = ch_qc_reports.mix(FASTQ_QC.out.stats)
-        ch_versions = ch_versions.mix(FASTQ_QC.out.versions)
+        ch_qc_reports = ch_qc_reports.mix(FASTQ_QC_ONT.out.stats)
+        ch_versions = ch_versions.mix(FASTQ_QC_ONT.out.versions)
 
     } else if (params.ont_simulator == 'nanosim') {
+        log.info "Using NanoSim for ONT simulation"
         NANOSIM(ch_ont_input)
         ch_ont_reads = NANOSIM.out.reads
         ch_versions = ch_versions.mix(NANOSIM.out.versions)
 
         // QC for ONT reads
-        FASTQ_QC(ch_ont_reads.map { meta, reads ->
+        FASTQ_QC_ONT(ch_ont_reads.map { meta, reads ->
             [meta + [platform: 'ont'], reads]
         })
-        ch_qc_reports = ch_qc_reports.mix(FASTQ_QC.out.stats)
-        ch_versions = ch_versions.mix(FASTQ_QC.out.versions)
+        ch_qc_reports = ch_qc_reports.mix(FASTQ_QC_ONT.out.stats)
+        ch_versions = ch_versions.mix(FASTQ_QC_ONT.out.versions)
+    } else {
+        log.info "No ONT simulator specified or unrecognized: ${params.ont_simulator}"
     }
 
     // PacBio simulation branch
@@ -62,11 +81,11 @@ workflow SIMULATE_READS {
         ch_versions = ch_versions.mix(PBSIM3_PACBIO.out.versions)
 
         // QC for PacBio reads
-        FASTQ_QC(ch_pacbio_reads.map { meta, reads ->
+        FASTQ_QC_PACBIO(ch_pacbio_reads.map { meta, reads ->
             [meta + [platform: 'pacbio'], reads]
         })
-        ch_qc_reports = ch_qc_reports.mix(FASTQ_QC.out.stats)
-        ch_versions = ch_versions.mix(FASTQ_QC.out.versions)
+        ch_qc_reports = ch_qc_reports.mix(FASTQ_QC_PACBIO.out.stats)
+        ch_versions = ch_versions.mix(FASTQ_QC_PACBIO.out.versions)
     }
 
     // Illumina simulation branch
@@ -78,11 +97,11 @@ workflow SIMULATE_READS {
     ch_versions = ch_versions.mix(ART_ILLUMINA.out.versions)
 
     // QC for Illumina reads - handle paired-end files properly
-    FASTQ_QC(ch_illumina_reads.map { meta, r1, r2 ->
+    FASTQ_QC_ILLUMINA(ch_illumina_reads.map { meta, r1, r2 ->
         [meta + [platform: 'illumina'], [r1, r2]]
     })
-    ch_qc_reports = ch_qc_reports.mix(FASTQ_QC.out.stats)
-    ch_versions = ch_versions.mix(FASTQ_QC.out.versions)
+    ch_qc_reports = ch_qc_reports.mix(FASTQ_QC_ILLUMINA.out.stats)
+    ch_versions = ch_versions.mix(FASTQ_QC_ILLUMINA.out.versions)
 
     // Collect all QC reports and create summary table
     ch_qc_reports
