@@ -27,8 +27,9 @@ process ART_ILLUMINA {
     def read_length = params.illumina_read_length != null ? params.illumina_read_length as Integer : 150
     def fragment_mean = params.illumina_fragment_mean != null ? params.illumina_fragment_mean as Integer : 300
     def fragment_sd = params.illumina_fragment_sd != null ? params.illumina_fragment_sd as Integer : 50
-    def system = params.illumina_system ?: 'HS25'
+    //def system = params.illumina_system ?: 'HS25'
     def genome_size = 3000000000L
+    def illumina_q_score = = params.illumina_q_score != null ? params.illumina_q_score as Integer : 42
 
     // Ensure all values are valid before calculation
     if (num_reads <= 0 || read_length <= 0) {
@@ -40,9 +41,9 @@ def fold_coverage = (num_reads * read_length * 2) / genome_size
     """
     art_illumina \\
         -p \\
-        -ss ${system} \\
         -i ${genome} \\
         -l ${read_length} \\
+        -q ${illumina_q_score} \\
         -f ${fold_coverage} \\
         -m ${fragment_mean} \\
         -s ${fragment_sd} \\
