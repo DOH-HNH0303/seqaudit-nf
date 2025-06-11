@@ -77,15 +77,14 @@ workflow SIMULATE_READS {
     ch_illumina_reads = ART_ILLUMINA.out.reads
     ch_versions = ch_versions.mix(ART_ILLUMINA.out.versions)
 
-    // QC for Illumina reads
-    FASTQ_QC(ch_illumina_reads.map { meta, reads ->
-        [meta + [platform: 'illumina'], reads]
+    // QC for Illumina reads - handle paired-end files properly
+    FASTQ_QC(ch_illumina_reads.map { meta, r1, r2 ->
+        [meta + [platform: 'illumina'], [r1, r2]]
     })
     ch_qc_reports = ch_qc_reports.mix(FASTQ_QC.out.stats)
     ch_versions = ch_versions.mix(FASTQ_QC.out.versions)
 
     // Collect all QC reports and create summary table
-    // Only run QC_SUMMARY if there are QC reports
     ch_qc_reports
         .map { meta, stats -> stats }
         .collect()
