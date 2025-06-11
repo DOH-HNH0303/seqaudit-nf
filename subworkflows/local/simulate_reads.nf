@@ -3,6 +3,8 @@ include { PBSIM3_ONT } from '../../modules/local/pbsim3_ont'
 include { PBSIM3_PACBIO } from '../../modules/local/pbsim3_pacbio'
 include { NANOSIM } from '../../modules/local/nanosim'
 include { ART_ILLUMINA } from '../../modules/local/art_illumina'
+include { FASTQ_QC } from '../../modules/local/fastq_qc'
+include { QC_SUMMARY } from '../../modules/local/qc_summary'
 
 workflow SIMULATE_READS {
     take:
@@ -46,8 +48,7 @@ workflow SIMULATE_READS {
             [meta + [platform: 'ont'], reads]
         })
         ch_qc_reports = ch_qc_reports.mix(FASTQ_QC.out.stats)
-        ch_versions = ch_versions.mix(FASTQ_QC.out.versions
-
+        ch_versions = ch_versions.mix(FASTQ_QC.out.versions)
     }
 
     // PacBio simulation branch
@@ -66,7 +67,6 @@ workflow SIMULATE_READS {
         })
         ch_qc_reports = ch_qc_reports.mix(FASTQ_QC.out.stats)
         ch_versions = ch_versions.mix(FASTQ_QC.out.versions)
-
     }
 
     // Illumina simulation branch
