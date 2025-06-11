@@ -23,7 +23,8 @@ workflow SIMULATE_READS {
     ch_ont_reads = Channel.empty()
 
     if (params.ont_simulator == 'pbsim3') {
-        PBSIM3_ONT(ch_ont_input)
+        ont_model_file = Channel.fromPath(params.ont_model_url)
+        PBSIM3_ONT(ch_ont_input, ont_model_file)
         ch_ont_reads = PBSIM3_ONT.out.reads
         ch_versions = ch_versions.mix(PBSIM3_ONT.out.versions)
     } else if (params.ont_simulator == 'nanosim') {
@@ -37,7 +38,8 @@ workflow SIMULATE_READS {
     ch_pacbio_reads = Channel.empty()
 
     if (params.pacbio_simulator == 'pbsim3') {
-        PBSIM3_PACBIO(ch_pacbio_input)
+        pacbio_model_file = Channel.fromPath(params.pacbio_model_url)
+        PBSIM3_PACBIO(ch_pacbio_input, pacbio_model_file)
         ch_pacbio_reads = PBSIM3_PACBIO.out.reads
         ch_versions = ch_versions.mix(PBSIM3_PACBIO.out.versions)
     }

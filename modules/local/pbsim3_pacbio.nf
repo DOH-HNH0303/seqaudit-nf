@@ -9,6 +9,7 @@ process PBSIM3_PACBIO {
 
     input:
     tuple val(meta), path(genome)
+    path(model_file)  // Direct model file input
 
     output:
     tuple val(meta), path("*.fastq.gz"), emit: reads
@@ -22,16 +23,23 @@ process PBSIM3_PACBIO {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     def num_reads = meta.pacbio_reads
-    def model = params.pacbio_model
     def mean_length = params.pacbio_read_length_mean
     def sd_length = params.pacbio_read_length_sd
     def accuracy = params.pacbio_accuracy
 
     """
+    # Verify model file exists
+    if [ ! -f "${model_file}" ]; then
+        echo "ERROR: Model file ${model_file} not found!"
+        exit 1
+    fi
+
+    echo "Using model file: ${model_file}"
+
     pbsim \\
         --strategy wgs \\
         --method qshmm \\
-        --qshmm \$CONDA_PREFIX/share/pbsim3/data/${model} \\
+        --qshmm ${model_file} \\
         --depth ${num_reads} \\
         --genome ${genome} \\
         --prefix ${prefix}_pacbio \\
@@ -42,7 +50,7 @@ process PBSIM3_PACBIO {
 
     # Compress output files
     gzip *.fastq
-    if [ -f *.maf ]; then
+    if ls *.maf 1> /dev/null 2>&1; then
         gzip *.maf
     fi
 
