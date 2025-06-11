@@ -85,10 +85,22 @@ workflow SIMULATE_READS {
     ch_versions = ch_versions.mix(FASTQ_QC.out.versions)
 
     // Collect all QC reports and create summary table
-    ch_all_qc = ch_qc_reports.map { meta, stats -> stats }.collect()
-    ch_versions_yml = ch_versions.collectFile(name: 'software_versions.yml')
+    // Only run QC_SUMMARY if there are QC reports
+    ch_qc_reports
+        .map { meta, stats -> stats }
+        .collect()
+        .set { ch_all_qc_files }
 
-    QC_SUMMARY(ch_all_qc, ch_versions_yml)
+    ch_versions_yml = ch_versions
+        .unique()
+        .collectFile(name: 'software_versions.yml')
+
+    // Only run QC_SUMMARY if we have QC files
+    ch_all_qc_files
+        .filter { it.size() > 0 }
+        .set { ch_qc_files_filtered }
+
+    QC_SUMMARY(ch_qc_files_filtered, ch_versions_yml)
 
     emit:
     ont_reads = ch_ont_reads
