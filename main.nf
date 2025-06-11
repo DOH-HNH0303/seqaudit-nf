@@ -22,7 +22,7 @@ nextflow.enable.dsl = 2
 // Include modules and subworkflows
 include { validateParameters; paramsHelp; paramsSummaryLog } from 'plugin/nf-validation'
 include { SIMULATE_READS } from './subworkflows/local/simulate_reads'
-include { MULTIQC } from './modules/local/multiqc'
+//include { MULTIQC } from './modules/local/multiqc'
 
 // Print help message if requested
 if (params.help) {
@@ -63,21 +63,10 @@ workflow {
     // Run simulation subworkflow
     SIMULATE_READS(ch_input)
 
-    // Collect QC reports for MultiQC
-    ch_multiqc_files = SIMULATE_READS.out.qc_reports.collect()
-
-    // Run MultiQC
-    MULTIQC(
-        ch_multiqc_files,
-        [],
-        [],
-        []
-    )
-
     // Emit outputs
     emit:
     ont_reads = SIMULATE_READS.out.ont_reads
     pacbio_reads = SIMULATE_READS.out.pacbio_reads
     illumina_reads = SIMULATE_READS.out.illumina_reads
-    multiqc_report = MULTIQC.out.report
+    qc_summary_table = SIMULATE_READS.out.qc_summary_table
 }
