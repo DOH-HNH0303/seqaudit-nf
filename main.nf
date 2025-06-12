@@ -19,35 +19,62 @@ nextflow.enable.dsl = 2
 ----------------------------------------------------------------------------------------
 */
 
-// Include nf-core utility functions
-include { UTILS_NEXTFLOW_PIPELINE } from './subworkflows/nf-core/utils_nextflow_pipeline'
-include { UTILS_NFCORE_PIPELINE } from './subworkflows/nf-core/utils_nfcore_pipeline'
-
 // Include main subworkflow
 include { SIMULATE_READS } from './subworkflows/local/simulate_reads'
 
+// Print help message if requested
+if (params.help) {
+    log.info """
+    Usage:
+    nextflow run main.nf --input samplesheet.csv --outdir results
+
+    Required arguments:
+      --input                   Path to comma-separated file containing information about the samples
+      --outdir                  The output directory where the results will be saved
+
+    Optional arguments:
+      --ont_simulator           ONT simulator to use ('pbsim3' or 'nanosim') [default: pbsim3]
+      --pacbio_simulator        PacBio simulator to use ('pbsim3') [default: pbsim3]
+      --help                    Show this help message and exit
+    """
+    exit 0
+}
+
+// Print parameter summary
+log.info """
+=======================================================
+SEQAUDIT PIPELINE PARAMETERS
+=======================================================
+Input/Output:
+  input                     : ${params.input}
+  outdir                    : ${params.outdir}
+
+ONT Simulation:
+  ont_simulator             : ${params.ont_simulator}
+  ont_model_url             : ${params.ont_model_url}
+
+PacBio Simulation:
+  pacbio_simulator          : ${params.pacbio_simulator}
+  pacbio_model_url          : ${params.pacbio_model_url}
+
+Illumina Simulation:
+  illumina_read_length      : ${params.illumina_read_length}
+  illumina_fragment_mean    : ${params.illumina_fragment_mean}
+=======================================================
+"""
+
 /*
 ========================================================================================
-    NAMED WORKFLOWS FOR PIPELINE
+    MAIN WORKFLOW
 ========================================================================================
 */
 
-//
-// WORKFLOW: Run main analysis pipeline depending on type of input
-//
-workflow SEQAUDIT {
+workflow {
 
-    take:
-    ch_samplesheet // channel: samplesheet read in from --input
-
-    main:
-
-    ch_versions = Channel.empty()
-
-    //
     // Create input channel from samplesheet
-    //
-    ch_input = ch_samplesheet
+    ch_input = Channel
+        .fromPath(params.input, checkIfExists: true)
+        .splitCsv(header: true)
         .map { row ->
             def meta = [:]
             meta.id = row.sample_id
@@ -60,72 +87,13 @@ workflow SEQAUDIT {
             return [meta, row.genome_id]
         }
 
-    //
     // Run simulation subworkflow
-    //
     SIMULATE_READS(ch_input)
-    ch_versions = ch_versions.mix(SIMULATE_READS.out.versions)
 
+    // Emit outputs
     emit:
-    ont_reads        = SIMULATE_READS.out.ont_reads
-    pacbio_reads     = SIMULATE_READS.out.pacbio_reads
-    illumina_reads   = SIMULATE_READS.out.illumina_reads
+    ont_reads = SIMULATE_READS.out.ont_reads
+    pacbio_reads = SIMULATE_READS.out.pacbio_reads
+    illumina_reads = SIMULATE_READS.out.illumina_reads
     qc_summary_table = SIMULATE_READS.out.qc_summary_table
-    versions         = ch_versions
-}
-
-/*
-========================================================================================
-    RUN MAIN WORKFLOW
-========================================================================================
-*/
-
-workflow {
-
-    main:
-
-    //
-    // SUBWORKFLOW: Run initialisation tasks
-    //
-    UTILS_NEXTFLOW_PIPELINE (
-        params.version,
-        params.help,
-        params.validate_params,
-        params.monochrome_logs,
-        args,
-        params.outdir,
-        params.input
-    )
-
-    //
-    // SUBWORKFLOW: Run nf-core/utils_nfcore_pipeline subworkflow
-    //
-    UTILS_NFCORE_PIPELINE (
-        params.version,
-        params.help,
-        params.validate_params,
-        params.monochrome_logs,
-        args,
-        params.outdir
-    )
-
-    //
-    // Read in samplesheet, validate and stage input files
-    //
-    ch_samplesheet = Channel
-        .fromPath(params.input, checkIfExists: true)
-        .splitCsv(header: true)
-
-    //
-    // WORKFLOW: Run main workflow
-    //
-    SEQAUDIT (
-        ch_samplesheet
-    )
-
-    emit:
-    ont_reads        = SEQAUDIT.out.ont_reads
-    pacbio_reads     = SEQAUDIT.out.pacbio_reads
-    illumina_reads   = SEQAUDIT.out.illumina_reads
-    qc_summary_table = SEQAUDIT.out.qc_summary_table
 }
