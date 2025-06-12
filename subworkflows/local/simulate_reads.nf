@@ -1,12 +1,8 @@
 include { FETCH_GENOME } from '../../modules/local/fetch_genome'
-include { PBSIM3_ONT } from '../../modules/local/pbsim3_ont'
-include { PBSIM3_PACBIO } from '../../modules/local/pbsim3_pacbio'
-include { NANOSIM } from '../../modules/local/nanosim'
-include { ART_ILLUMINA } from '../../modules/local/art_illumina'
-include { FASTQ_QC_ONT } from '../../modules/local/fastq_qc_ont'
-include { FASTQ_QC_PACBIO } from '../../modules/local/fastq_qc_pacbio'
-include { FASTQ_QC_ILLUMINA } from '../../modules/local/fastq_qc_illumina'
-include { QC_SUMMARY } from '../../modules/local/qc_summary'
+include { PBSIM3_ONT_MULTI } from '../../modules/local/pbsim3_ont_multi'
+include { PBSIM3_PACBIO_MULTI } from '../../modules/local/pbsim3_pacbio_multi'
+include { ART_ILLUMINA_MULTI } from '../../modules/local/art_illumina_multi'
+include { FASTQ_QC_CONSOLIDATED } from '../../modules/local/fastq_qc_consolidated'
 
 workflow SIMULATE_READS {
     take:
@@ -14,7 +10,9 @@ workflow SIMULATE_READS {
 
     main:
     ch_versions = Channel.empty()
-    ch_qc_reports = Channel.empty()
+    ch_all_ont_reads = Channel.empty()
+    ch_all_pacbio_reads = Channel.empty()
+    ch_all_illumina_reads = Channel.empty()
 
     // Debug: Print parameters
     log.info "ONT simulator: ${params.ont_simulator}"
@@ -30,101 +28,73 @@ workflow SIMULATE_READS {
     // Debug: Check what's in the channel
     ch_genomes.view { meta, genome -> "Genome channel: ${meta}" }
 
-    // ONT simulation branch
+    // ONT simulation branch - generate multiple datasets per sample
     ch_ont_input = ch_genomes.filter { meta, genome ->
         log.info "Checking ONT reads for ${meta.id}: ${meta.ont_reads}"
         meta.ont_reads > 0
     }
-    ch_ont_reads = Channel.empty()
 
     // Debug: Check filtered channel
-    ch_ont_input.view { meta, genome -> "ONT input: ${meta.id} with ${meta.ont_reads} reads" }
+    ch_ont_input.view { meta, genome -> "ONT input: ${meta.id} with ${meta.ont_reads} datasets" }
 
     if (params.ont_simulator == 'pbsim3') {
         log.info "Using PBSIM3 for ONT simulation"
         ont_model_file = Channel.fromPath(params.ont_model_url)
-        PBSIM3_ONT(ch_ont_input, ont_model_file)
-        ch_ont_reads = PBSIM3_ONT.out.reads
-        ch_versions = ch_versions.mix(PBSIM3_ONT.out.versions)
-
-        // QC for ONT reads
-        FASTQ_QC_ONT(ch_ont_reads.map { meta, reads ->
-            [meta + [platform: 'ont'], reads]
-        })
-        ch_qc_reports = ch_qc_reports.mix(FASTQ_QC_ONT.out.stats)
-        ch_versions = ch_versions.mix(FASTQ_QC_ONT.out.versions)
-
-    } else if (params.ont_simulator == 'nanosim') {
-        log.info "Using NanoSim for ONT simulation"
-        NANOSIM(ch_ont_input)
-        ch_ont_reads = NANOSIM.out.reads
-        ch_versions = ch_versions.mix(NANOSIM.out.versions)
-
-        // QC for ONT reads
-        FASTQ_QC_ONT(ch_ont_reads.map { meta, reads ->
-            [meta + [platform: 'ont'], reads]
-        })
-        ch_qc_reports = ch_qc_reports.mix(FASTQ_QC_ONT.out.stats)
-        ch_versions = ch_versions.mix(FASTQ_QC_ONT.out.versions)
+        PBSIM3_ONT_MULTI(ch_ont_input, ont_model_file)
+        ch_all_ont_reads = PBSIM3_ONT_MULTI.out.reads
+            .map { meta, reads -> reads }
+            .flatten()
+            .collect()
+        ch_versions = ch_versions.mix(PBSIM3_ONT_MULTI.out.versions)
     } else {
         log.info "No ONT simulator specified or unrecognized: ${params.ont_simulator}"
+        ch_all_ont_reads = Channel.empty()
     }
 
-    // PacBio simulation branch
+    // PacBio simulation branch - generate multiple datasets per sample
     ch_pacbio_input = ch_genomes.filter { meta, genome -> meta.pacbio_reads > 0 }
-    ch_pacbio_reads = Channel.empty()
 
     if (params.pacbio_simulator == 'pbsim3') {
         pacbio_model_file = Channel.fromPath(params.pacbio_model_url)
-        PBSIM3_PACBIO(ch_pacbio_input, pacbio_model_file)
-        ch_pacbio_reads = PBSIM3_PACBIO.out.reads
-        ch_versions = ch_versions.mix(PBSIM3_PACBIO.out.versions)
-
-        // QC for PacBio reads
-        FASTQ_QC_PACBIO(ch_pacbio_reads.map { meta, reads ->
-            [meta + [platform: 'pacbio'], reads]
-        })
-        ch_qc_reports = ch_qc_reports.mix(FASTQ_QC_PACBIO.out.stats)
-        ch_versions = ch_versions.mix(FASTQ_QC_PACBIO.out.versions)
+        PBSIM3_PACBIO_MULTI(ch_pacbio_input, pacbio_model_file)
+        ch_all_pacbio_reads = PBSIM3_PACBIO_MULTI.out.reads
+            .map { meta, reads -> reads }
+            .flatten()
+            .collect()
+        ch_versions = ch_versions.mix(PBSIM3_PACBIO_MULTI.out.versions)
+    } else {
+        ch_all_pacbio_reads = Channel.empty()
     }
 
-    // Illumina simulation branch
+    // Illumina simulation branch - generate multiple datasets per sample
     ch_illumina_input = ch_genomes.filter { meta, genome -> meta.illumina_reads > 0 }
-    ch_illumina_reads = Channel.empty()
 
-    ART_ILLUMINA(ch_illumina_input)
-    ch_illumina_reads = ART_ILLUMINA.out.reads
-    ch_versions = ch_versions.mix(ART_ILLUMINA.out.versions)
-
-    // QC for Illumina reads - handle paired-end files properly
-    FASTQ_QC_ILLUMINA(ch_illumina_reads.map { meta, r1, r2 ->
-        [meta + [platform: 'illumina'], [r1, r2]]
-    })
-    ch_qc_reports = ch_qc_reports.mix(FASTQ_QC_ILLUMINA.out.stats)
-    ch_versions = ch_versions.mix(FASTQ_QC_ILLUMINA.out.versions)
-
-    // Collect all QC reports and create summary table
-    ch_qc_reports
-        .map { meta, stats -> stats }
+    ART_ILLUMINA_MULTI(ch_illumina_input)
+    ch_all_illumina_reads = ART_ILLUMINA_MULTI.out.reads
+        .map { meta, r1_files, r2_files -> [r1_files, r2_files] }
+        .transpose()
+        .flatten()
         .collect()
-        .set { ch_all_qc_files }
+    ch_versions = ch_versions.mix(ART_ILLUMINA_MULTI.out.versions)
 
+    // Create consolidated QC report
     ch_versions_yml = ch_versions
         .unique()
         .collectFile(name: 'software_versions.yml')
 
-    // Only run QC_SUMMARY if we have QC files
-    ch_all_qc_files
-        .filter { it.size() > 0 }
-        .set { ch_qc_files_filtered }
-
-    QC_SUMMARY(ch_qc_files_filtered, ch_versions_yml)
+    FASTQ_QC_CONSOLIDATED(
+        ch_all_ont_reads.ifEmpty([]),
+        ch_all_pacbio_reads.ifEmpty([]),
+        ch_all_illumina_reads.ifEmpty([]),
+        ch_versions_yml
+    )
 
     emit:
-    ont_reads = ch_ont_reads
-    pacbio_reads = ch_pacbio_reads
-    illumina_reads = ch_illumina_reads
-    qc_reports = ch_qc_reports
-    qc_summary_table = QC_SUMMARY.out.summary_table
+    ont_reads = ch_all_ont_reads
+    pacbio_reads = ch_all_pacbio_reads
+    illumina_reads = ch_all_illumina_reads
+    ont_qc_stats = FASTQ_QC_CONSOLIDATED.out.ont_stats
+    pacbio_qc_stats = FASTQ_QC_CONSOLIDATED.out.pacbio_stats
+    illumina_qc_stats = FASTQ_QC_CONSOLIDATED.out.illumina_stats
     versions = ch_versions
 }

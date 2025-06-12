@@ -95,5 +95,7 @@ workflow {
     ont_reads = SIMULATE_READS.out.ont_reads
     pacbio_reads = SIMULATE_READS.out.pacbio_reads
     illumina_reads = SIMULATE_READS.out.illumina_reads
-    qc_summary_table = SIMULATE_READS.out.qc_summary_table
+    ont_qc_stats = SIMULATE_READS.out.ont_qc_stats
+    pacbio_qc_stats = SIMULATE_READS.out.pacbio_qc_stats
+    illumina_qc_stats = SIMULATE_READS.out.illumina_qc_stats
 }
