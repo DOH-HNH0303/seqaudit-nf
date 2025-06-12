@@ -20,21 +20,48 @@ nextflow.enable.dsl = 2
 */
 
 // Include modules and subworkflows
-include { validateParameters; paramsHelp; paramsSummaryLog } from 'plugin/nf-validation'
 include { SIMULATE_READS } from './subworkflows/local/simulate_reads'
-//include { MULTIQC } from './modules/local/multiqc'
 
 // Print help message if requested
 if (params.help) {
-    log.info paramsHelp("nextflow run main.nf --input samplesheet.csv --outdir results")
+    log.info """
+    Usage:
+    nextflow run main.nf --input samplesheet.csv --outdir results
+
+    Required arguments:
+      --input                   Path to comma-separated file containing information about the samples
+      --outdir                  The output directory where the results will be saved
+
+    Optional arguments:
+      --ont_simulator           ONT simulator to use ('pbsim3' or 'nanosim') [default: pbsim3]
+      --pacbio_simulator        PacBio simulator to use ('pbsim3') [default: pbsim3]
+      --help                    Show this help message and exit
+    """
     exit 0
 }
 
-// Validate parameters
-//validateParameters()
-
 // Print parameter summary
-log.info paramsSummaryLog(workflow)
+log.info """
+=======================================================
+SEQAUDIT PIPELINE PARAMETERS
+=======================================================
+Input/Output:
+  input                     : ${params.input}
+  outdir                    : ${params.outdir}
+
+ONT Simulation:
+  ont_simulator             : ${params.ont_simulator}
+  ont_model_url             : ${params.ont_model_url}
+
+PacBio Simulation:
+  pacbio_simulator          : ${params.pacbio_simulator}
+  pacbio_model_url          : ${params.pacbio_model_url}
+
+Illumina Simulation:
+  illumina_read_length      : ${params.illumina_read_length}
+  illumina_fragment_mean    : ${params.illumina_fragment_mean}
+=======================================================
+"""
 
 /*
 ========================================================================================
