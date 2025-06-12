@@ -82,10 +82,15 @@ workflow SIMULATE_READS {
         .unique()
         .collectFile(name: 'software_versions.yml')
 
+    // Ensure channels have proper default values
+    ch_ont_for_qc = ch_all_ont_reads.ifEmpty(Channel.value([]))
+    ch_pacbio_for_qc = ch_all_pacbio_reads.ifEmpty(Channel.value([]))
+    ch_illumina_for_qc = ch_all_illumina_reads.ifEmpty(Channel.value([]))
+
     FASTQ_QC_CONSOLIDATED(
-        ch_all_ont_reads.ifEmpty([]),
-        ch_all_pacbio_reads.ifEmpty([]),
-        ch_all_illumina_reads.ifEmpty([]),
+        ch_ont_for_qc,
+        ch_pacbio_for_qc,
+        ch_illumina_for_qc,
         ch_versions_yml
     )
 
