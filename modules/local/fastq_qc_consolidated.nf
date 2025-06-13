@@ -27,8 +27,8 @@ process FASTQ_QC_CONSOLIDATED {
     def args = task.ext.args ?: ''
 
     """
-    # Remove pipefail temporarily to prevent SIGPIPE issues
-    set -euo
+    # Set bash options - removed pipefail to prevent SIGPIPE issues
+    set -eu
 
     # Function to safely run commands
     safe_run() {
