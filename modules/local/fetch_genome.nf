@@ -33,10 +33,26 @@ process FETCH_GENOME {
         """
     } else if (meta.genome_source == 'refseq' || meta.genome_source == 'genbank') {
         """
-        # Download from NCBI
-        esearch -db assembly -query "${genome_id}" | \\
-        elink -target nuccore | \\
-        efetch -format fasta > ${prefix}.fasta
+        # Set database type: "refseq" or "genbank"
+
+        # Define output file based on database selection
+        if [[ "${meta.genome_source}" == "refseq" ]]; then
+            filter="^>CP|^>NC"  # RefSeq identifiers
+        elif [[ "${meta.genome_source}" == "genbank" ]]; then
+            filter="^>NZ|^>GCA"  # GenBank identifiers
+        else
+            echo "Invalid database selection: choose 'refseq' or 'genbank'"
+            exit 1
+        fi
+
+        # Run esearch, elink, efetch with filtering
+        esearch -db assembly -query "${genome_id}" | \
+            elink -target nuccore | \
+            efetch -format fasta | \
+            grep -E "${filter}" > "${prefix}.fasta"
+
+        echo "Downloaded ${meta.genome_source} sequences into ${output_file}"
+
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":

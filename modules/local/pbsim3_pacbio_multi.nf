@@ -12,7 +12,7 @@ process PBSIM3_PACBIO_MULTI {
     path model_file
 
     output:
-    tuple val(meta), path("*.fastq.gz"), emit: reads
+    tuple val(meta), path("*final*.fastq.gz"), emit: reads
     path "versions.yml", emit: versions
 
     when:
@@ -41,7 +41,7 @@ process PBSIM3_PACBIO_MULTI {
     for i in \$(seq 1 ${num_datasets}); do
         dataset_prefix="${prefix}_pacbio_dataset_\${i}"
         echo "Generating PacBio dataset \${i} with prefix \${dataset_prefix}"
-        
+
         pbsim \\
             --strategy wgs \\
             --method qshmm \\
@@ -85,8 +85,12 @@ process PBSIM3_PACBIO_MULTI {
         exit 1
     fi
 
-    echo "Final PacBio dataset files:"
-    ls -la *_pacbio_dataset_*.fastq.gz
+    datasets=$(ls *_pacbio_dataset_*.fastq.gz | awk -F'_' '{print $4}' | sort -u)
+    for dataset in $datasets; do
+        cat ${prefix}_pacbio_dataset_${dataset}_*.fastq.gz > ${prefix}_pacbio_dataset_final_${dataset}.fastq.gz; done
+
+    echo "Final pacbio dataset files:"
+    ls -la *_pacbio_dataset_final*.fastq.gz
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

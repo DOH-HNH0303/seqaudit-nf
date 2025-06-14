@@ -7,3 +7,5 @@ testing/
 testing*
 *.pyc
 null/
+ont.model
+pbsim3_ont_test.sh

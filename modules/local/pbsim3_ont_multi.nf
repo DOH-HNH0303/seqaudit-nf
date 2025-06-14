@@ -12,7 +12,7 @@ process PBSIM3_ONT_MULTI {
     path model_file
 
     output:
-    tuple val(meta), path("*.fastq.gz"), emit: reads
+    tuple val(meta), path("*final*.fastq.gz"), emit: reads
     path "versions.yml", emit: versions
 
     when:
@@ -41,7 +41,7 @@ process PBSIM3_ONT_MULTI {
     for i in \$(seq 1 ${num_datasets}); do
         dataset_prefix="${prefix}_ont_dataset_\${i}"
         echo "Generating ONT dataset \${i} with prefix \${dataset_prefix}"
-        
+
         pbsim \\
             --strategy wgs \\
             --method qshmm \\
@@ -85,8 +85,12 @@ process PBSIM3_ONT_MULTI {
         exit 1
     fi
 
+    datasets=$(ls *_ont_dataset_*.fastq.gz | awk -F'_' '{print $4}' | sort -u)
+    for dataset in $datasets; do
+        cat ${prefix}_ont_dataset_${dataset}_*.fastq.gz > ${prefix}_ont_dataset_final_${dataset}.fastq.gz; done
+
     echo "Final ONT dataset files:"
-    ls -la *_ont_dataset_*.fastq.gz
+    ls -la *_ont_dataset_final*.fastq.gz
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -99,7 +103,7 @@ process PBSIM3_ONT_MULTI {
     def num_datasets = meta.ont_reads
     """
     for i in \$(seq 1 ${num_datasets}); do
-        touch ${prefix}_ont_dataset_\${i}_0001.fastq.gz
+        touch ${prefix}_ont_dataset_final_\${i}.fastq.gz
     done
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
