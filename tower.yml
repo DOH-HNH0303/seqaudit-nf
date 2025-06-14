@@ -1,5 +1,5 @@
 reports:
   "*/*/*stats.txt":
     display: "Synthetic fastq QC metrics"
-  "*/*/.fastq.gz"
+  "*/*/.fastq.gz":
     display: "Synthetic fastq.gz files"
