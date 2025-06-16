@@ -85,9 +85,9 @@ process PBSIM3_PACBIO_MULTI {
         exit 1
     fi
 
-    datasets=$(ls *_pacbio_dataset_*.fastq.gz | awk -F'_' '{print $4}' | sort -u)
-    for dataset in $datasets; do
-        cat ${prefix}_pacbio_dataset_${dataset}_*.fastq.gz > ${prefix}_pacbio_dataset_final_${dataset}.fastq.gz; done
+    datasets=\$(ls *_pacbio_dataset_*.fastq.gz | awk -F'_' '{print \$4}' | sort -u)
+    for dataset in \$datasets; do
+        cat ${prefix}_pacbio_dataset_\${dataset}_*.fastq.gz > ${prefix}_pacbio_dataset_final_\${dataset}.fastq.gz; done
 
     echo "Final pacbio dataset files:"
     ls -la *_pacbio_dataset_final*.fastq.gz
