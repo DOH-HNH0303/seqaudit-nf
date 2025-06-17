@@ -74,18 +74,15 @@ workflow SIMULATE_READS {
 
     // Illumina simulation branch - generate multiple datasets per sample
     ch_illumina_input = ch_genomes.filter { meta, genome -> meta.illumina_reads > 0 }
-    if (ch_illumina_input.count().map { it > 0 }.first()) {
-        ART_ILLUMINA_MULTI(ch_illumina_input)
-        // FIXED: Proper channel handling for Illumina reads
-        ch_all_illumina_reads = ART_ILLUMINA_MULTI.out.reads
-            .map { meta, r1_files, r2_files ->
-                // Return separate R1 and R2 channels
-                return [meta, r1_files, r2_files]
-            }
-        ch_versions = ch_versions.mix(ART_ILLUMINA_MULTI.out.versions)
-    } else {
-        ch_all_illumina_reads = Channel.empty()
-    }
+
+    // Process Illumina samples
+    ART_ILLUMINA_MULTI(ch_illumina_input)
+    ch_all_illumina_reads = ART_ILLUMINA_MULTI.out.reads
+        .map { meta, r1_files, r2_files ->
+            // Return separate R1 and R2 channels
+            return [meta, r1_files, r2_files]
+        }
+    ch_versions = ch_versions.mix(ART_ILLUMINA_MULTI.out.versions)
 
     // Create consolidated QC report
     ch_versions_yml = ch_versions
@@ -132,42 +129,55 @@ workflow SIMULATE_READS {
     )
 
     // Prepare data for manifest creation
-    // Combine all sample data by meta.id
+    // Get all unique sample metadata
     ch_all_samples = ch_genomes
         .map { meta, genome -> meta }
         .unique { it.id }
 
-    // Create manifest input channel by joining all read types
+    // Prepare channels for joining - add sample ID as key and provide default empty files
+    ch_ont_for_manifest = ch_all_ont_reads
+        .map { meta, reads ->
+            def firstRead = reads instanceof List ? reads[0] : reads
+            return [meta.id, firstRead]
+        }
+        .ifEmpty([])
+
+    ch_pacbio_for_manifest = ch_all_pacbio_reads
+        .map { meta, reads ->
+            def firstRead = reads instanceof List ? reads[0] : reads
+            return [meta.id, firstRead]
+        }
+        .ifEmpty([])
+
+    ch_illumina_for_manifest = ch_all_illumina_reads
+        .map { meta, r1_files, r2_files ->
+            def firstR1 = r1_files instanceof List ? r1_files[0] : r1_files
+            def firstR2 = r2_files instanceof List ? r2_files[0] : r2_files
+            return [meta.id, firstR1, firstR2]
+        }
+        .ifEmpty([])
+
+    // Create manifest input by joining all channels
     ch_manifest_input = ch_all_samples
-        .map { meta ->
-            // Get ONT reads for this sample
-            def ont_reads = ch_all_ont_reads
-                .filter { ont_meta, ont_files -> ont_meta.id == meta.id }
-                .map { ont_meta, ont_files -> ont_files instanceof List ? ont_files[0] : ont_files }
-                .ifEmpty([file('NO_FILE')])
-                .first()
+        .map { meta -> [meta.id, meta] }
+        .join(ch_ont_for_manifest, remainder: true)
+        .join(ch_pacbio_for_manifest, remainder: true)
+        .join(ch_illumina_for_manifest, remainder: true)
+        .map { tuple ->
+            def sample_id = tuple[0]
+            def meta = tuple[1]
+            def ont_file = tuple.size() > 2 ? tuple[2] : null
+            def pacbio_file = tuple.size() > 3 ? tuple[3] : null
+            def illumina_r1 = tuple.size() > 4 ? tuple[4] : null
+            def illumina_r2 = tuple.size() > 5 ? tuple[5] : null
 
-            // Get PacBio reads for this sample
-            def pacbio_reads = ch_all_pacbio_reads
-                .filter { pacbio_meta, pacbio_files -> pacbio_meta.id == meta.id }
-                .map { pacbio_meta, pacbio_files -> pacbio_files instanceof List ? pacbio_files[0] : pacbio_files }
-                .ifEmpty([file('NO_FILE')])
-                .first()
+            // Handle missing files by providing NO_FILE placeholder
+            def ont_path = ont_file ?: file('NO_FILE')
+            def pacbio_path = pacbio_file ?: file('NO_FILE')
+            def illumina_r1_path = illumina_r1 ?: file('NO_FILE')
+            def illumina_r2_path = illumina_r2 ?: file('NO_FILE')
 
-            // Get Illumina reads for this sample
-            def illumina_r1 = ch_all_illumina_reads
-                .filter { ill_meta, r1_files, r2_files -> ill_meta.id == meta.id }
-                .map { ill_meta, r1_files, r2_files -> r1_files instanceof List ? r1_files[0] : r1_files }
-                .ifEmpty([file('NO_FILE')])
-                .first()
-
-            def illumina_r2 = ch_all_illumina_reads
-                .filter { ill_meta, r1_files, r2_files -> ill_meta.id == meta.id }
-                .map { ill_meta, r1_files, r2_files -> r2_files instanceof List ? r2_files[0] : r2_files }
-                .ifEmpty([file('NO_FILE')])
-                .first()
-
-            return [meta, ont_reads, pacbio_reads, illumina_r1, illumina_r2]
+            return [meta, ont_path, pacbio_path, illumina_r1_path, illumina_r2_path]
         }
 
     // Create individual manifests for each sample

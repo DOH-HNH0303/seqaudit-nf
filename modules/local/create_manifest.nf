@@ -22,10 +22,10 @@ process CREATE_MANIFEST {
     def prefix = task.ext.prefix ?: "${meta.id}"
 
     // Handle optional file inputs - check if files exist and are not empty placeholders
-    def ont_path = ont_fastq && ont_fastq.name != 'NO_FILE' && ont_fastq.size() > 0 ? ont_fastq : ''
-    def pacbio_path = pacbio_fastq && pacbio_fastq.name != 'NO_FILE' && pacbio_fastq.size() > 0 ? pacbio_fastq : ''
-    def illumina_r1_path = illumina_r1 && illumina_r1.name != 'NO_FILE' && illumina_r1.size() > 0 ? illumina_r1 : ''
-    def illumina_r2_path = illumina_r2 && illumina_r2.name != 'NO_FILE' && illumina_r2.size() > 0 ? illumina_r2 : ''
+    def ont_path = ont_fastq && ont_fastq.name != 'NO_FILE' ? ont_fastq : ''
+    def pacbio_path = pacbio_fastq && pacbio_fastq.name != 'NO_FILE' ? pacbio_fastq : ''
+    def illumina_r1_path = illumina_r1 && illumina_r1.name != 'NO_FILE' ? illumina_r1 : ''
+    def illumina_r2_path = illumina_r2 && illumina_r2.name != 'NO_FILE' ? illumina_r2 : ''
 
     """
     #!/usr/bin/env python3
