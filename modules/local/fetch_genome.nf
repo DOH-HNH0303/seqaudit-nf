@@ -5,7 +5,7 @@ process FETCH_GENOME {
     conda "bioconda::entrez-direct=16.2"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/entrez-direct:16.2--he881be0_1' :
-        'quay.io/biocontainers/entrez-direct:16.2--he881be0_1' }"
+        'quay.io/biocontainers/entrez-direct:24.0--he881be0_0' }"
 
     input:
     tuple val(meta), val(genome_id)
