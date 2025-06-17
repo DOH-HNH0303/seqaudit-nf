@@ -49,10 +49,9 @@ process FETCH_GENOME {
         esearch -db assembly -query "${genome_id}" | \
             elink -target nuccore | \
             efetch -format fasta | \
-            grep -E "${filter}" > "${prefix}.fasta"
+            grep -E "\$filter" > "${prefix}.fasta"
 
-        echo "Downloaded ${meta.genome_source} sequences into ${output_file}"
-
+        echo "Downloaded ${meta.genome_source} sequences into ${prefix}.fasta"
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
