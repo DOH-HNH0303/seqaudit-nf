@@ -80,6 +80,11 @@ workflow {
             meta.ont_reads = row.ont_reads as Integer ?: 0
             meta.pacbio_reads = row.pacbio_reads as Integer ?: 0
             meta.illumina_reads = row.illumina_reads as Integer ?: 0
+
+            // Debug: Print parsed metadata
+            log.info "Parsed sample: ${meta.id} - ont_reads: ${meta.ont_reads}, pacbio_reads: ${meta.pacbio_reads}, illumina_reads: ${meta.illumina_reads}"
+            log.info "  genome_source: ${meta.genome_source}, genome_id: ${meta.genome_id}"
+
             return [meta, row.genome_id]
         }
 

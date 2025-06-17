@@ -27,7 +27,7 @@ workflow SIMULATE_READS {
     ch_genomes = FETCH_GENOME.out.genome
 
     // Debug: Check what's in the channel
-    ch_genomes.view { meta, genome -> "Genome channel: ${meta}" }
+    ch_genomes.view { meta, genome -> "Genome channel: ${meta.id} - ont_reads: ${meta.ont_reads}, genome_source: ${meta.genome_source}, genome_id: ${meta.genome_id}" }
 
     ch_genomes
     .multiMap { meta, genome ->
@@ -36,6 +36,11 @@ workflow SIMULATE_READS {
         illumina: meta.illumina_reads > 0 ? [meta, genome] : null
     }
     .set { ch_branched }
+
+    // Debug: Check branching logic
+    ch_branched.ont.view { "ONT branch: ${it}" }
+    ch_branched.pacbio.view { "PacBio branch: ${it}" }
+    ch_branched.illumina.view { "Illumina branch: ${it}" }
 
     // Then use the individual branches
     ch_ont_input = ch_branched.ont.filter { it != null }
