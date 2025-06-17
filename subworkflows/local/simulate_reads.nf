@@ -29,11 +29,24 @@ workflow SIMULATE_READS {
     // Debug: Check what's in the channel
     ch_genomes.view { meta, genome -> "Genome channel: ${meta}" }
 
-    // ONT simulation branch - generate multiple datasets per sample
-    ch_ont_input = ch_genomes.filter { meta, genome ->
-        log.info "Checking ONT reads for ${meta.id}: ${meta.ont_reads}"
-        meta.ont_reads > 0
+    ch_genomes
+    .multiMap { meta, genome ->
+        ont: meta.ont_reads > 0 ? [meta, genome] : null
+        pacbio: meta.pacbio_reads > 0 ? [meta, genome] : null
+        illumina: meta.illumina_reads > 0 ? [meta, genome] : null
     }
+    .set { ch_branched }
+
+    // Then use the individual branches
+    ch_ont_input = ch_branched.ont.filter { it != null }
+    ch_pacbio_input = ch_branched.pacbio.filter { it != null }
+    ch_illumina_input = ch_branched.illumina.filter { it != null }
+
+    // ONT simulation branch - generate multiple datasets per sample
+    // ch_ont_input = ch_genomes.filter { meta, genome ->
+    //     log.info "Checking ONT reads for ${meta.id}: ${meta.ont_reads}"
+    //     meta.ont_reads > 0
+    // }
 
     // Debug: Check filtered channel
     ch_ont_input.view { meta, genome -> "ONT input: ${meta.id} with ${meta.ont_reads} datasets" }
@@ -56,7 +69,7 @@ workflow SIMULATE_READS {
     }
 
     // PacBio simulation branch - generate multiple datasets per sample
-    ch_pacbio_input = ch_genomes.filter { meta, genome -> meta.pacbio_reads > 0 }
+    // ch_pacbio_input = ch_genomes.filter { meta, genome -> meta.pacbio_reads > 0 }
     if (params.pacbio_simulator == 'pbsim3') {
         pacbio_model_file = Channel.fromPath(params.pacbio_model_url)
         PBSIM3_PACBIO_MULTI(ch_pacbio_input, pacbio_model_file)
@@ -73,7 +86,7 @@ workflow SIMULATE_READS {
     }
 
     // Illumina simulation branch - generate multiple datasets per sample
-    ch_illumina_input = ch_genomes.filter { meta, genome -> meta.illumina_reads > 0 }
+    //ch_illumina_input = ch_genomes.filter { meta, genome -> meta.illumina_reads > 0 }
 
     // Process Illumina samples
     ART_ILLUMINA_MULTI(ch_illumina_input)
