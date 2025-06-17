@@ -179,7 +179,7 @@ workflow SIMULATE_READS {
 
             return [meta, ont_path, pacbio_path, illumina_r1_path, illumina_r2_path]
         }
-
+    ch_manifest_input.view()
     // Create individual manifests for each sample
     CREATE_MANIFEST(ch_manifest_input)
     ch_versions = ch_versions.mix(CREATE_MANIFEST.out.versions)
