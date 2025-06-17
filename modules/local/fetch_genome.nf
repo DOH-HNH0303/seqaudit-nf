@@ -49,7 +49,7 @@ process FETCH_GENOME {
         esearch -db assembly -query "${genome_id}" | \
             elink -target nuccore | \
             efetch -format fasta | \
-            awk -v pat="$filter" '/^>/ {flag=0} $0 ~ pat {print; flag=1; next} flag {print}' > "${prefix}.fasta"
+            awk -v pat="$filter" '/^>/ {flag=0} \$0 ~ pat {print; flag=1; next} flag {print}' > "${prefix}.fasta"
 
 
         echo "Downloaded ${meta.genome_source} sequences into ${prefix}.fasta"
