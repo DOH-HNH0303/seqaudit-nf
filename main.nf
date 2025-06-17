@@ -4,18 +4,16 @@ nextflow.enable.dsl = 2
 
 /*
 ========================================================================================
-    SEQAUDIT - SEQUENCING DATA SIMULATION PIPELINE
+SEQAUDIT - SEQUENCING DATA SIMULATION PIPELINE
 ========================================================================================
-    A comprehensive pipeline to simulate ONT, PacBio, and Illumina sequencing data
-    from reference genomes
-
-    Usage:
-    nextflow run main.nf --input samplesheet.csv --outdir results
-
-    Input formats supported:
-    - RefSeq ID (e.g., GCF_000005825.2)
-    - GenBank ID (e.g., GCA_000001405.29)
-    - Local FASTA file path
+A comprehensive pipeline to simulate ONT, PacBio, and Illumina sequencing data
+from reference genomes
+Usage:
+nextflow run main.nf --input samplesheet.csv --outdir results
+Input formats supported:
+- RefSeq ID (e.g., GCF_000005825.2)
+- GenBank ID (e.g., GCA_000001405.29)
+- Local FASTA file path
 ----------------------------------------------------------------------------------------
 */
 
@@ -29,13 +27,13 @@ if (params.help) {
     nextflow run main.nf --input samplesheet.csv --outdir results
 
     Required arguments:
-      --input                   Path to comma-separated file containing information about the samples
-      --outdir                  The output directory where the results will be saved
+    --input                   Path to comma-separated file containing information about the samples
+    --outdir                  The output directory where the results will be saved
 
     Optional arguments:
-      --ont_simulator           ONT simulator to use ('pbsim3' or 'nanosim') [default: pbsim3]
-      --pacbio_simulator        PacBio simulator to use ('pbsim3') [default: pbsim3]
-      --help                    Show this help message and exit
+    --ont_simulator           ONT simulator to use ('pbsim3' or 'nanosim') [default: pbsim3]
+    --pacbio_simulator        PacBio simulator to use ('pbsim3') [default: pbsim3]
+    --help                    Show this help message and exit
     """
     exit 0
 }
@@ -46,31 +44,30 @@ log.info """
 SEQAUDIT PIPELINE PARAMETERS
 =======================================================
 Input/Output:
-  input                     : ${params.input}
-  outdir                    : ${params.outdir}
+input                     : ${params.input}
+outdir                    : ${params.outdir}
 
 ONT Simulation:
-  ont_simulator             : ${params.ont_simulator}
-  ont_model_url             : ${params.ont_model_url}
+ont_simulator             : ${params.ont_simulator}
+ont_model_url             : ${params.ont_model_url}
 
 PacBio Simulation:
-  pacbio_simulator          : ${params.pacbio_simulator}
-  pacbio_model_url          : ${params.pacbio_model_url}
+pacbio_simulator          : ${params.pacbio_simulator}
+pacbio_model_url          : ${params.pacbio_model_url}
 
 Illumina Simulation:
-  illumina_read_length      : ${params.illumina_read_length}
-  illumina_fragment_mean    : ${params.illumina_fragment_mean}
+illumina_read_length      : ${params.illumina_read_length}
+illumina_fragment_mean    : ${params.illumina_fragment_mean}
 =======================================================
 """
 
 /*
 ========================================================================================
-    MAIN WORKFLOW
+MAIN WORKFLOW
 ========================================================================================
 */
 
 workflow {
-
     // Create input channel from samplesheet
     ch_input = Channel
         .fromPath(params.input, checkIfExists: true)
@@ -83,7 +80,6 @@ workflow {
             meta.ont_reads = row.ont_reads as Integer ?: 0
             meta.pacbio_reads = row.pacbio_reads as Integer ?: 0
             meta.illumina_reads = row.illumina_reads as Integer ?: 0
-
             return [meta, row.genome_id]
         }
 
@@ -98,4 +94,5 @@ workflow {
     ont_qc_stats = SIMULATE_READS.out.ont_qc_stats
     pacbio_qc_stats = SIMULATE_READS.out.pacbio_qc_stats
     illumina_qc_stats = SIMULATE_READS.out.illumina_qc_stats
+    manifest = SIMULATE_READS.out.manifest
 }

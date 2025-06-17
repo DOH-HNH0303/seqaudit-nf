@@ -3,6 +3,7 @@ include { PBSIM3_ONT_MULTI } from '../../modules/local/pbsim3_ont_multi'
 include { PBSIM3_PACBIO_MULTI } from '../../modules/local/pbsim3_pacbio_multi'
 include { ART_ILLUMINA_MULTI } from '../../modules/local/art_illumina_multi'
 include { FASTQ_QC_CONSOLIDATED } from '../../modules/local/fastq_qc_consolidated'
+include { CREATE_MANIFEST } from '../../modules/local/create_manifest'
 
 workflow SIMULATE_READS {
     take:
@@ -41,82 +42,49 @@ workflow SIMULATE_READS {
         log.info "Using PBSIM3 for ONT simulation"
         ont_model_file = Channel.fromPath(params.ont_model_url)
         PBSIM3_ONT_MULTI(ch_ont_input, ont_model_file)
-
         // FIXED: Proper channel handling for ONT reads
         ch_all_ont_reads = PBSIM3_ONT_MULTI.out.reads
             .map { meta, reads ->
                 // Ensure reads is a list and flatten if needed
                 def readsList = reads instanceof List ? reads.flatten() : [reads]
-                return readsList
+                return [meta, readsList]
             }
-            .flatten()
-            .collect()
-            .ifEmpty([])
-
         ch_versions = ch_versions.mix(PBSIM3_ONT_MULTI.out.versions)
     } else {
         log.info "No ONT simulator specified or unrecognized: ${params.ont_simulator}"
-        ch_all_ont_reads = Channel.value([])
+        ch_all_ont_reads = Channel.empty()
     }
 
     // PacBio simulation branch - generate multiple datasets per sample
     ch_pacbio_input = ch_genomes.filter { meta, genome -> meta.pacbio_reads > 0 }
-
     if (params.pacbio_simulator == 'pbsim3') {
         pacbio_model_file = Channel.fromPath(params.pacbio_model_url)
         PBSIM3_PACBIO_MULTI(ch_pacbio_input, pacbio_model_file)
-
         // FIXED: Proper channel handling for PacBio reads
         ch_all_pacbio_reads = PBSIM3_PACBIO_MULTI.out.reads
             .map { meta, reads ->
                 // Ensure reads is a list and flatten if needed
                 def readsList = reads instanceof List ? reads.flatten() : [reads]
-                return readsList
+                return [meta, readsList]
             }
-            .flatten()
-            .collect()
-            .ifEmpty([])
-
         ch_versions = ch_versions.mix(PBSIM3_PACBIO_MULTI.out.versions)
     } else {
-        ch_all_pacbio_reads = Channel.value([])
+        ch_all_pacbio_reads = Channel.empty()
     }
 
     // Illumina simulation branch - generate multiple datasets per sample
     ch_illumina_input = ch_genomes.filter { meta, genome -> meta.illumina_reads > 0 }
-
     if (ch_illumina_input.count().map { it > 0 }.first()) {
         ART_ILLUMINA_MULTI(ch_illumina_input)
-
         // FIXED: Proper channel handling for Illumina reads
         ch_all_illumina_reads = ART_ILLUMINA_MULTI.out.reads
             .map { meta, r1_files, r2_files ->
-                // Combine R1 and R2 files properly
-                def allFiles = []
-
-                // Handle R1 files
-                if (r1_files instanceof List) {
-                    allFiles.addAll(r1_files)
-                } else if (r1_files != null) {
-                    allFiles.add(r1_files)
-                }
-
-                // Handle R2 files
-                if (r2_files instanceof List) {
-                    allFiles.addAll(r2_files)
-                } else if (r2_files != null) {
-                    allFiles.add(r2_files)
-                }
-
-                return allFiles
+                // Return separate R1 and R2 channels
+                return [meta, r1_files, r2_files]
             }
-            .flatten()
-            .collect()
-            .ifEmpty([])
-
         ch_versions = ch_versions.mix(ART_ILLUMINA_MULTI.out.versions)
     } else {
-        ch_all_illumina_reads = Channel.value([])
+        ch_all_illumina_reads = Channel.empty()
     }
 
     // Create consolidated QC report
@@ -124,11 +92,37 @@ workflow SIMULATE_READS {
         .unique()
         .collectFile(name: 'software_versions.yml')
 
-    // FIXED: Ensure channels have proper values - no need for additional ifEmpty here
-    // since we already handled it above
+    // Prepare channels for QC (flattened for QC purposes)
     ch_ont_for_qc = ch_all_ont_reads
+        .map { meta, reads -> reads instanceof List ? reads.flatten() : [reads] }
+        .flatten()
+        .collect()
+        .ifEmpty([])
+
     ch_pacbio_for_qc = ch_all_pacbio_reads
+        .map { meta, reads -> reads instanceof List ? reads.flatten() : [reads] }
+        .flatten()
+        .collect()
+        .ifEmpty([])
+
     ch_illumina_for_qc = ch_all_illumina_reads
+        .map { meta, r1_files, r2_files ->
+            def allFiles = []
+            if (r1_files instanceof List) {
+                allFiles.addAll(r1_files)
+            } else if (r1_files != null) {
+                allFiles.add(r1_files)
+            }
+            if (r2_files instanceof List) {
+                allFiles.addAll(r2_files)
+            } else if (r2_files != null) {
+                allFiles.add(r2_files)
+            }
+            return allFiles
+        }
+        .flatten()
+        .collect()
+        .ifEmpty([])
 
     FASTQ_QC_CONSOLIDATED(
         ch_ont_for_qc,
@@ -137,6 +131,49 @@ workflow SIMULATE_READS {
         ch_versions_yml
     )
 
+    // Prepare data for manifest creation
+    // Combine all sample data by meta.id
+    ch_all_samples = ch_genomes
+        .map { meta, genome -> meta }
+        .unique { it.id }
+
+    // Create manifest input channel by joining all read types
+    ch_manifest_input = ch_all_samples
+        .map { meta ->
+            // Get ONT reads for this sample
+            def ont_reads = ch_all_ont_reads
+                .filter { ont_meta, ont_files -> ont_meta.id == meta.id }
+                .map { ont_meta, ont_files -> ont_files instanceof List ? ont_files[0] : ont_files }
+                .ifEmpty([file('NO_FILE')])
+                .first()
+
+            // Get PacBio reads for this sample
+            def pacbio_reads = ch_all_pacbio_reads
+                .filter { pacbio_meta, pacbio_files -> pacbio_meta.id == meta.id }
+                .map { pacbio_meta, pacbio_files -> pacbio_files instanceof List ? pacbio_files[0] : pacbio_files }
+                .ifEmpty([file('NO_FILE')])
+                .first()
+
+            // Get Illumina reads for this sample
+            def illumina_r1 = ch_all_illumina_reads
+                .filter { ill_meta, r1_files, r2_files -> ill_meta.id == meta.id }
+                .map { ill_meta, r1_files, r2_files -> r1_files instanceof List ? r1_files[0] : r1_files }
+                .ifEmpty([file('NO_FILE')])
+                .first()
+
+            def illumina_r2 = ch_all_illumina_reads
+                .filter { ill_meta, r1_files, r2_files -> ill_meta.id == meta.id }
+                .map { ill_meta, r1_files, r2_files -> r2_files instanceof List ? r2_files[0] : r2_files }
+                .ifEmpty([file('NO_FILE')])
+                .first()
+
+            return [meta, ont_reads, pacbio_reads, illumina_r1, illumina_r2]
+        }
+
+    // Create individual manifests for each sample
+    CREATE_MANIFEST(ch_manifest_input)
+    ch_versions = ch_versions.mix(CREATE_MANIFEST.out.versions)
+
     emit:
     ont_reads = ch_all_ont_reads
     pacbio_reads = ch_all_pacbio_reads
@@ -144,5 +181,6 @@ workflow SIMULATE_READS {
     ont_qc_stats = FASTQ_QC_CONSOLIDATED.out.ont_stats
     pacbio_qc_stats = FASTQ_QC_CONSOLIDATED.out.pacbio_stats
     illumina_qc_stats = FASTQ_QC_CONSOLIDATED.out.illumina_stats
+    manifest = CREATE_MANIFEST.out.manifest
     versions = ch_versions
 }

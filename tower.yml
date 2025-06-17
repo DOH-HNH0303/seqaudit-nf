@@ -1,5 +1,7 @@
 reports:
   "*/*/*stats.txt":
     display: "Synthetic fastq QC metrics"
-  "*/*/.fastq.gz":
+  "*/*/*.fastq.gz":
     display: "Synthetic fastq.gz files"
+  "*/*/*_manifest.csv":
+    display: "manifest of generated files"
