@@ -1,6 +1,6 @@
 process FETCH_GENOME {
     tag "$meta.id"
-    label 'process_low'
+    label 'process_single'
 
     conda "bioconda::entrez-direct=16.2"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
