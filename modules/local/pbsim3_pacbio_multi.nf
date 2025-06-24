@@ -85,9 +85,21 @@ process PBSIM3_PACBIO_MULTI {
         exit 1
     fi
 
-    datasets=\$(ls *_pacbio_dataset_*.fastq.gz | awk -F'_' '{print \$4}' | sort -u)
-    for dataset in \$datasets; do
-        cat ${prefix}_pacbio_dataset_\${dataset}_*.fastq.gz > ${prefix}_pacbio_dataset_final_\${dataset}.fastq.gz; done
+    # Concatenate files by dataset number - CORRECTED SECTION
+    echo "Concatenating files by dataset..."
+    for file in *_pacbio_dataset_*.fastq.gz; do
+        if [ -f "\$file" ]; then
+            echo "Processing file: \$file"
+            dataset=\$(echo "\$file" | awk -F'_' '{print \$5}')
+            echo "Extracted dataset: \$dataset"
+
+            # Check if we haven't already processed this dataset
+            if [ ! -f "${prefix}_pacbio_dataset_final_\${dataset}.fastq.gz" ]; then
+                echo "Creating final file for dataset \$dataset"
+                cat ${prefix}_pacbio_dataset_\${dataset}_*.fastq.gz > ${prefix}_pacbio_dataset_final_\${dataset}.fastq.gz
+            fi
+        fi
+    done
 
     echo "Final pacbio dataset files:"
     ls -la *_pacbio_dataset_final*.fastq.gz
@@ -103,7 +115,7 @@ process PBSIM3_PACBIO_MULTI {
     def num_datasets = meta.pacbio_reads
     """
     for i in \$(seq 1 ${num_datasets}); do
-        touch ${prefix}_pacbio_dataset_\${i}_0001.fastq.gz
+        touch ${prefix}_pacbio_dataset_final_\${i}.fastq.gz
     done
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
