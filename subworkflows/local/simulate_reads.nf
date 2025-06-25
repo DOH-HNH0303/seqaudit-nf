@@ -27,34 +27,30 @@ workflow SIMULATE_READS {
     ch_genomes = FETCH_GENOME.out.genome
 
     // Debug: Check what's in the channel
-    ch_genomes.view { meta, genome -> "Genome channel: ${meta.id} - ont_reads: ${meta.ont_reads}, genome_source: ${meta.genome_source}, genome_id: ${meta.genome_id}" }
+    ch_genomes.view { meta, genome -> "Genome channel: ${meta.id} - ont_reads: ${meta.ont_reads}, pacbio_reads: ${meta.pacbio_reads}, illumina_reads: ${meta.illumina_reads}" }
 
-    ch_genomes
-    .multiMap { meta, genome ->
-        ont: meta.ont_reads > 0 ? [meta, genome] : null
-        pacbio: meta.pacbio_reads > 0 ? [meta, genome] : null
-        illumina: meta.illumina_reads > 0 ? [meta, genome] : null
+    // Create separate channels for each technology using direct filtering
+    ch_ont_input = ch_genomes.filter { meta, genome ->
+        log.info "Checking ONT for ${meta.id}: ${meta.ont_reads} reads"
+        meta.ont_reads > 0
     }
-    .set { ch_branched }
 
-    // Debug: Check branching logic
-    ch_branched.ont.view { "ONT branch: ${it}" }
-    ch_branched.pacbio.view { "PacBio branch: ${it}" }
-    ch_branched.illumina.view { "Illumina branch: ${it}" }
+    ch_pacbio_input = ch_genomes.filter { meta, genome ->
+        log.info "Checking PacBio for ${meta.id}: ${meta.pacbio_reads} reads"
+        meta.pacbio_reads > 0
+    }
 
-    // Then use the individual branches
-    ch_ont_input = ch_branched.ont.filter { it != null }
-    ch_pacbio_input = ch_branched.pacbio.filter { it != null }
-    ch_illumina_input = ch_branched.illumina.filter { it != null }
+    ch_illumina_input = ch_genomes.filter { meta, genome ->
+        log.info "Checking Illumina for ${meta.id}: ${meta.illumina_reads} reads"
+        meta.illumina_reads > 0
+    }
+
+    // Debug: Check filtered channels
+    ch_ont_input.view { meta, genome -> "ONT input: ${meta.id} with ${meta.ont_reads} datasets" }
+    ch_pacbio_input.view { meta, genome -> "PacBio input: ${meta.id} with ${meta.pacbio_reads} datasets" }
+    ch_illumina_input.view { meta, genome -> "Illumina input: ${meta.id} with ${meta.illumina_reads} datasets" }
 
     // ONT simulation branch - generate multiple datasets per sample
-    // ch_ont_input = ch_genomes.filter { meta, genome ->
-    //     log.info "Checking ONT reads for ${meta.id}: ${meta.ont_reads}"
-    //     meta.ont_reads > 0
-    // }
-
-    // Debug: Check filtered channel
-    ch_ont_input.view { meta, genome -> "ONT input: ${meta.id} with ${meta.ont_reads} datasets" }
 
     if (params.ont_simulator == 'pbsim3') {
         log.info "Using PBSIM3 for ONT simulation"
@@ -74,7 +70,6 @@ workflow SIMULATE_READS {
     }
 
     // PacBio simulation branch - generate multiple datasets per sample
-    // ch_pacbio_input = ch_genomes.filter { meta, genome -> meta.pacbio_reads > 0 }
     if (params.pacbio_simulator == 'pbsim3') {
         pacbio_model_file = Channel.fromPath(params.pacbio_model_url)
         PBSIM3_PACBIO_MULTI(ch_pacbio_input, pacbio_model_file)
@@ -91,7 +86,6 @@ workflow SIMULATE_READS {
     }
 
     // Illumina simulation branch - generate multiple datasets per sample
-    //ch_illumina_input = ch_genomes.filter { meta, genome -> meta.illumina_reads > 0 }
 
     // Process Illumina samples
     ART_ILLUMINA_MULTI(ch_illumina_input)
@@ -146,54 +140,46 @@ workflow SIMULATE_READS {
         ch_versions_yml
     )
 
-    // Prepare data for manifest creation
-    // Get all unique sample metadata
-    ch_all_samples = ch_genomes
-        .map { meta, genome -> meta }
-        .unique { it.id }
-
-    // Prepare channels for joining - add sample ID as key and provide default empty files
-    ch_ont_for_manifest = ch_all_ont_reads
+    // Prepare data for manifest creation using a simpler approach
+    // Create maps for each technology type
+    ch_ont_files = ch_all_ont_reads
         .map { meta, reads ->
             def firstRead = reads instanceof List ? reads[0] : reads
             return [meta.id, firstRead]
         }
-        .ifEmpty([])
 
-    ch_pacbio_for_manifest = ch_all_pacbio_reads
+    ch_pacbio_files = ch_all_pacbio_reads
         .map { meta, reads ->
             def firstRead = reads instanceof List ? reads[0] : reads
             return [meta.id, firstRead]
         }
-        .ifEmpty([])
 
-    ch_illumina_for_manifest = ch_all_illumina_reads
+    ch_illumina_files = ch_all_illumina_reads
         .map { meta, r1_files, r2_files ->
             def firstR1 = r1_files instanceof List ? r1_files[0] : r1_files
             def firstR2 = r2_files instanceof List ? r2_files[0] : r2_files
             return [meta.id, firstR1, firstR2]
         }
-        .ifEmpty([])
 
-    // Create manifest input by joining all channels
-    ch_manifest_input = ch_all_samples
-        .map { meta -> [meta.id, meta] }
-        .join(ch_ont_for_manifest, remainder: true)
-        .join(ch_pacbio_for_manifest, remainder: true)
-        .join(ch_illumina_for_manifest, remainder: true)
+    // Get all sample metadata and create manifest input
+    ch_manifest_input = ch_genomes
+        .map { meta, genome -> [meta.id, meta] }
+        .join(ch_ont_files, remainder: true)
+        .join(ch_pacbio_files, remainder: true)
+        .join(ch_illumina_files, remainder: true)
         .map { tuple ->
             def sample_id = tuple[0]
             def meta = tuple[1]
-            def ont_file = tuple.size() > 2 ? tuple[2] : null
-            def pacbio_file = tuple.size() > 3 ? tuple[3] : null
-            def illumina_r1 = tuple.size() > 4 ? tuple[4] : null
-            def illumina_r2 = tuple.size() > 5 ? tuple[5] : null
+            def ont_file = tuple.size() > 2 && tuple[2] != null ? tuple[2] : null
+            def pacbio_file = tuple.size() > 3 && tuple[3] != null ? tuple[3] : null
+            def illumina_r1 = tuple.size() > 4 && tuple[4] != null ? tuple[4] : null
+            def illumina_r2 = tuple.size() > 5 && tuple[5] != null ? tuple[5] : null
 
             // Handle missing files by providing unique placeholder files
-            def ont_path = ont_file ?: file("NO_FILE_ont_${sample_id}")
-            def pacbio_path = pacbio_file ?: file("NO_FILE_pacbio_${sample_id}")
-            def illumina_r1_path = illumina_r1 ?: file("NO_FILE_illumina_r1_${sample_id}")
-            def illumina_r2_path = illumina_r2 ?: file("NO_FILE_illumina_r2_${sample_id}")
+            def ont_path = ont_file ? ont_file : file("NO_FILE_ont_${sample_id}")
+            def pacbio_path = pacbio_file ? pacbio_file : file("NO_FILE_pacbio_${sample_id}")
+            def illumina_r1_path = illumina_r1 ? illumina_r1 : file("NO_FILE_illumina_r1_${sample_id}")
+            def illumina_r2_path = illumina_r2 ? illumina_r2 : file("NO_FILE_illumina_r2_${sample_id}")
 
             return [meta, ont_path, pacbio_path, illumina_r1_path, illumina_r2_path]
         }
