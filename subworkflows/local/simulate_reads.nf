@@ -189,11 +189,11 @@ workflow SIMULATE_READS {
             def illumina_r1 = tuple.size() > 4 ? tuple[4] : null
             def illumina_r2 = tuple.size() > 5 ? tuple[5] : null
 
-            // Handle missing files by providing NO_FILE placeholder
-            def ont_path = ont_file ?: file('NO_FILE')
-            def pacbio_path = pacbio_file ?: file('NO_FILE')
-            def illumina_r1_path = illumina_r1 ?: file('NO_FILE')
-            def illumina_r2_path = illumina_r2 ?: file('NO_FILE')
+            // Handle missing files by providing unique placeholder files
+            def ont_path = ont_file ?: file("NO_FILE_ont_${sample_id}")
+            def pacbio_path = pacbio_file ?: file("NO_FILE_pacbio_${sample_id}")
+            def illumina_r1_path = illumina_r1 ?: file("NO_FILE_illumina_r1_${sample_id}")
+            def illumina_r2_path = illumina_r2 ?: file("NO_FILE_illumina_r2_${sample_id}")
 
             return [meta, ont_path, pacbio_path, illumina_r1_path, illumina_r2_path]
         }
