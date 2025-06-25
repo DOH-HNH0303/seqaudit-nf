@@ -82,11 +82,17 @@ workflow {
             meta.illumina_reads = row.illumina_reads as Integer ?: 0
 
             // Debug: Print parsed metadata
-            log.info "Parsed sample: ${meta.id} - ont_reads: ${meta.ont_reads}, pacbio_reads: ${meta.pacbio_reads}, illumina_reads: ${meta.illumina_reads}"
-            log.info "  genome_source: ${meta.genome_source}, genome_id: ${meta.genome_id}"
+            log.info "📝 Parsed sample: ${meta.id} - ont_reads: ${meta.ont_reads}, pacbio_reads: ${meta.pacbio_reads}, illumina_reads: ${meta.illumina_reads}"
+            log.info "   genome_source: ${meta.genome_source}, genome_id: ${meta.genome_id}"
 
             return [meta, row.genome_id]
         }
+
+    // Debug: View input channel
+    ch_input.view { meta, genome_id -> "🔍 INPUT CHANNEL: ${meta.id} (${meta.genome_source}: ${genome_id})" }
+
+    // Count input samples
+    ch_input.count().view { count -> "📊 TOTAL INPUT SAMPLES: ${count}" }
 
     // Run simulation subworkflow
     SIMULATE_READS(ch_input)

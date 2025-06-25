@@ -85,4 +85,14 @@ process FETCH_GENOME {
     } else {
         error "Unknown genome source: ${meta.genome_source}"
     }
+
+    stub:
+    def prefix = task.ext.prefix ?: "${meta.id}"
+    """
+    touch ${prefix}.fasta
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        stub: "stub mode"
+    END_VERSIONS
+    """
 }

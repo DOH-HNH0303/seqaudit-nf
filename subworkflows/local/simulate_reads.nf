@@ -27,7 +27,10 @@ workflow SIMULATE_READS {
     ch_genomes = FETCH_GENOME.out.genome
 
     // Debug: Check what's in the channel
-    ch_genomes.view { meta, genome -> "Genome channel: ${meta.id} - ont_reads: ${meta.ont_reads}, pacbio_reads: ${meta.pacbio_reads}, illumina_reads: ${meta.illumina_reads}" }
+    ch_genomes.view { meta, genome -> "🧬 GENOME CHANNEL: ${meta.id} - ont_reads: ${meta.ont_reads}, pacbio_reads: ${meta.pacbio_reads}, illumina_reads: ${meta.illumina_reads}" }
+
+    // Count total samples in genome channel
+    ch_genomes.count().view { count -> "📊 TOTAL SAMPLES IN GENOME CHANNEL: ${count}" }
 
     // Create separate channels for each technology using direct filtering
     ch_ont_input = ch_genomes.filter { meta, genome ->
