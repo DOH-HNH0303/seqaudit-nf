@@ -89,11 +89,11 @@ workflow {
         }
 
     // Debug: View input channel
-    ch_input.view { meta, genome_id -> "🔍 INPUT CHANNEL: ${meta.id} (${meta.genome_source}: ${genome_id})" }
+    //ch_input.view { meta, genome_id -> "🔍 INPUT CHANNEL: ${meta.id} (${meta.genome_source}: ${genome_id})" }
 
     // Count input samples
-    ch_input.count().view { count -> "📊 TOTAL INPUT SAMPLES: ${count}" }
-
+    //ch_input.count().view { count -> "📊 TOTAL INPUT SAMPLES: ${count}" }
+    //ch_input.view()
     // Run simulation subworkflow
     SIMULATE_READS(ch_input)
 
