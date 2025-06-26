@@ -41,40 +41,37 @@ workflow SIMULATE_READS {
         "🧬 [${System.currentTimeMillis() - startTime}ms] GENOME_FETCHED: ${meta.id} - ont:${meta.ont_reads}, pacbio:${meta.pacbio_reads}, illumina:${meta.illumina_reads}, genome_size:${genome.size()} bytes"
     }
 
-    // Create separate channels for each technology using direct filtering
+    // Create separate channels for each technology using multiMap to duplicate items
     log.info "🔀 [${System.currentTimeMillis() - startTime}ms] Creating filtered channels for each technology"
-    //ch_genomes.view()
-    ch_input.map { meta, genome ->tuple(*([
-        meta.id,
-        meta.genome_source,
-        meta.genome_id,
-        meta.ont_reads,
-        meta.pacbio_reads,
-        meta.illumina_reads,
-        genome]))
-    }.collect(flat: false).set
-  //.view()
 
-    // ch_genomes.map{meta, genome -> [meta], genome}.spread().collect().view()
-    ch_ont_input = ch_genomes.filter { meta, genome ->
-        def willProcess = meta.ont_reads > 0
-        log.info "🔍 [${System.currentTimeMillis() - startTime}ms] ONT_FILTER: ${meta.id} - reads:${meta.ont_reads}, will_process:${willProcess}"
-        return willProcess
-    }
+    // Use multiMap to duplicate each item to multiple channels based on conditions
+    ch_genomes
+        .multiMap { meta, genome ->
+            ont: meta.ont_reads > 0 ? [meta, genome] : null
+            pacbio: meta.pacbio_reads > 0 ? [meta, genome] : null
+            illumina: meta.illumina_reads > 0 ? [meta, genome] : null
+            manifest: [meta, genome]  // All samples go to manifest
+        }
+        .set { ch_split }
 
-    ch_pacbio_input = ch_genomes.filter { meta, genome ->
-        def willProcess = meta.pacbio_reads > 0
-        log.info "🔍 [${System.currentTimeMillis() - startTime}ms] PACBIO_FILTER: ${meta.id} - reads:${meta.pacbio_reads}, will_process:${willProcess}"
-        return willProcess
-    }
+    // Filter out null values from each channel
+    ch_ont_input = ch_split.ont.filter { it != null }
+    ch_pacbio_input = ch_split.pacbio.filter { it != null }
+    ch_illumina_input = ch_split.illumina.filter { it != null }
+    ch_genomes_for_manifest = ch_split.manifest
+
     // Debug: Check filtered results
-    ch_ont_input.view { meta, genome -> "DEBUG: ONT filtered: ${meta.id}" }
-    ch_pacbio_input.view { meta, genome -> "DEBUG: PacBio filtered: ${meta.id}" }
-
-    ch_illumina_input = ch_genomes.filter { meta, genome ->
-        def willProcess = meta.illumina_reads > 0
-        log.info "🔍 [${System.currentTimeMillis() - startTime}ms] ILLUMINA_FILTER: ${meta.id} - reads:${meta.illumina_reads}, will_process:${willProcess}"
-        return willProcess
+    ch_ont_input.view { meta, genome ->
+        log.info "🔍 [${System.currentTimeMillis() - startTime}ms] ONT_FILTER: ${meta.id} - reads:${meta.ont_reads}, will_process:true"
+        "DEBUG: ONT filtered: ${meta.id}"
+    }
+    ch_pacbio_input.view { meta, genome ->
+        log.info "🔍 [${System.currentTimeMillis() - startTime}ms] PACBIO_FILTER: ${meta.id} - reads:${meta.pacbio_reads}, will_process:true"
+        "DEBUG: PacBio filtered: ${meta.id}"
+    }
+    ch_illumina_input.view { meta, genome ->
+        log.info "🔍 [${System.currentTimeMillis() - startTime}ms] ILLUMINA_FILTER: ${meta.id} - reads:${meta.illumina_reads}, will_process:true"
+        "DEBUG: Illumina filtered: ${meta.id}"
     }
 
     // Debug: Check filtered channels with detailed timing
@@ -267,7 +264,7 @@ workflow SIMULATE_READS {
     // Get all sample metadata and create manifest input
     log.info "🔗 [${System.currentTimeMillis() - startTime}ms] Joining channels for manifest creation"
 
-    ch_manifest_input = ch_genomes
+    ch_manifest_input = ch_genomes_for_manifest
         .map { meta, genome ->
             log.info "🔗 [${System.currentTimeMillis() - startTime}ms] GENOME_FOR_MANIFEST: ${meta.id}"
             return [meta.id, meta]
